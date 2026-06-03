@@ -1,0 +1,16 @@
+# Secrets
+key.env
+
+# Python environment
+.venv/
+
+# Local editor/project files
+.vscode/
+.qodo/
+
+# Generated output
+results.xlsx
+
+# Python cache
+__pycache__/
+*.pyc
