@@ -787,6 +787,14 @@
     return row;
   }
 
+  function updateAnswerRow(row, text){
+    const content = row.querySelector('.answer-content');
+    if(!content) return;
+    content.replaceChildren();
+    renderAnswer(text, content);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
   function appendInlineText(parent, text){
     const tokenPattern = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g;
     let cursor = 0;
@@ -1014,12 +1022,37 @@
     }
 
     try{
-      const response = await fetch('/api/chemistry', { method:'POST', body });
-      const result = await response.json();
-      if(!response.ok) throw new Error(result.error || 'The chemistry service failed.');
+      const response = await fetch('/api/chemistry/stream', { method:'POST', body });
+      if(!response.ok){
+        const result = await response.json();
+        throw new Error(result.error || 'The chemistry service failed.');
+      }
+
       const typingRow = document.getElementById('typingRow');
       if(typingRow) typingRow.remove();
-      addRow(result.answer, false);
+      const answerRow = addRow('', false);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let answer = '';
+
+      while(true){
+        const chunk = await reader.read();
+        if(chunk.done) break;
+        buffer += decoder.decode(chunk.value, {stream:true});
+        const events = buffer.split('\n\n');
+        buffer = events.pop();
+        events.forEach(event => {
+          const line = event.split('\n').find(item => item.startsWith('data: '));
+          if(!line) return;
+          const result = JSON.parse(line.slice(6));
+          if(result.error) throw new Error(result.error);
+          if(result.text){
+            answer += result.text;
+            updateAnswerRow(answerRow, answer);
+          }
+        });
+      }
     }catch(error){
       const typingRow = document.getElementById('typingRow');
       if(typingRow) typingRow.remove();
