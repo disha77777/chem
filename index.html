@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PINKMAN // batch log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil:wght@500;700;900&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --asphalt: #120e0d;
+    --asphalt-2: #1c1513;
+    --asphalt-3: #251b18;
+    --paper: #ece2d6;
+    --paper-dim: #b8ab9c;
+    --pink: #ff2f77;
+    --pink-deep: #c4155a;
+    --pink-glow: #ff8fb8;
+    --hazard: #e8b923;
+    --line: rgba(236,226,214,0.09);
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; }
+
+  body{
+    margin:0;
+    background:
+      radial-gradient(ellipse at 20% -10%, rgba(255,47,119,0.10), transparent 45%),
+      repeating-linear-gradient(0deg, transparent, transparent 39px, var(--line) 40px),
+      repeating-linear-gradient(90deg, transparent, transparent 39px, var(--line) 40px),
+      var(--asphalt);
+    color: var(--paper);
+    font-family: 'IBM Plex Mono', monospace;
+    min-height: 100dvh;
+  }
+
+  /* mobile-first: app fills the screen like a native chat app */
+  .app{
+    width:100%;
+    height:100vh;
+    height:100dvh;
+    display:flex;
+    flex-direction:column;
+    background: var(--asphalt-2);
+    position:relative;
+    overflow:hidden;
+  }
+
+  /* from tablet width up: centered card, desktop-style chrome */
+  @media (min-width:700px){
+    body{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding: 40px 20px;
+    }
+    .app{
+      width:100%;
+      max-width: 900px;
+      height: min(760px, 88vh);
+      border: 1px solid rgba(255,143,184,0.16);
+      box-shadow: 0 40px 90px -30px rgba(0,0,0,0.8);
+    }
+  }
+
+  /* corner hazard clips, like a sample crate */
+  .app::before, .app::after{
+    content:"";
+    position:absolute;
+    width:26px; height:26px;
+    background:
+      repeating-linear-gradient(45deg, var(--hazard) 0 5px, var(--asphalt) 5px 10px);
+    opacity:0.85;
+  }
+  .app::before{ top:-1px; left:-1px; clip-path: polygon(0 0, 100% 0, 0 100%); }
+  .app::after{ bottom:-1px; right:-1px; clip-path: polygon(100% 100%, 100% 0, 0 100%); }
+
+  /* ---------- two screens: landing greeting + chat ---------- */
+  .landing-screen, .chat-screen{
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    display: none;
+    flex-direction: column;
+  }
+  .app.state-landing .landing-screen{ display:flex; }
+  .app.state-chat .chat-screen{ display:flex; }
+
+  .landing-screen{
+    align-items:center;
+    justify-content:center;
+    overflow-y:auto;
+    padding: 28px 20px;
+    gap: clamp(22px, 5vw, 34px);
+    text-align:center;
+  }
+
+  .landing-topline{
+    font-size:12px;
+    color: var(--paper-dim);
+  }
+  .link-pink{
+    color: var(--pink-glow);
+    text-decoration:none;
+    border-bottom:1px solid rgba(255,143,184,0.4);
+    cursor:pointer;
+  }
+  .link-pink:hover{ color: var(--pink); border-color: var(--pink); }
+
+  .greeting{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap: 12px;
+  }
+  .greeting svg{
+    width: clamp(22px, 5vw, 30px);
+    height: clamp(22px, 5vw, 30px);
+    filter: drop-shadow(0 0 6px rgba(255,47,119,0.7));
+    flex:0 0 auto;
+  }
+  .greeting h2{
+    margin:0;
+    font-family:'Big Shoulders Stencil', sans-serif;
+    font-weight:900;
+    font-size: clamp(30px, 8vw, 46px);
+    letter-spacing:0.5px;
+    text-shadow: 0 0 24px rgba(255,47,119,0.3);
+  }
+
+  .landing-box{
+    width:100%;
+    max-width:560px;
+    background: var(--asphalt-3);
+    border:1px solid rgba(255,143,184,0.18);
+    border-radius:16px;
+    text-align:left;
+    box-shadow: 0 25px 60px -30px rgba(255,47,119,0.3);
+    overflow:hidden;
+  }
+  .landing-box textarea{
+    width:100%;
+    height:auto;
+    min-height:64px;
+    background:transparent;
+    border:none;
+    resize:none;
+    color: var(--paper);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:15px;
+    padding: 18px 54px 6px 18px;
+    outline:none;
+  }
+  .landing-box textarea::placeholder{ color: rgba(184,171,156,0.6); font-style:italic; }
+  .landing-model-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding: 0 18px 14px;
+    font-family:'Big Shoulders Stencil', sans-serif;
+    font-size:13px;
+    letter-spacing:1px;
+    color: var(--pink-glow);
+  }
+  .landing-secondary{
+    border-top:1px solid rgba(255,143,184,0.12);
+    padding: 11px 16px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    font-size:12.5px;
+    color: var(--paper-dim);
+  }
+  .landing-secondary .icon-group{ display:flex; align-items:center; gap:14px; }
+  .icon-btn{
+    background:none;
+    border:none;
+    color: var(--paper-dim);
+    cursor:pointer;
+    display:flex; align-items:center; gap:6px;
+    padding:4px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    transition: color 0.15s ease;
+  }
+  .icon-btn svg{ width:17px; height:17px; }
+  .icon-btn:hover{ color: var(--pink-glow); }
+  .icon-btn.strong{ color: var(--paper); font-weight:600; }
+  .icon-btn.strong:hover{ color: var(--pink-glow); }
+
+  .landing-send{
+    position:absolute;
+    right:14px;
+    bottom:14px;
+    width:32px; height:32px;
+    border-radius:50%;
+    border:none;
+    background: var(--pink);
+    color: var(--asphalt);
+    cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    opacity:0;
+    pointer-events:none;
+    transform: scale(0.85);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+  }
+  .landing-send.active{ opacity:1; pointer-events:auto; transform:scale(1); }
+  .landing-send svg{ width:15px; height:15px; }
+
+  .landing-box-wrap{ position:relative; width:100%; max-width:560px; }
+
+  .landing-preview-strip{
+    display:flex; gap:8px; flex-wrap:wrap;
+    padding: 0 16px 12px;
+  }
+  .landing-preview-strip:empty{ display:none; }
+
+  .recent-row{
+    width:100%;
+    max-width:560px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    font-size:13px;
+    color: var(--paper-dim);
+  }
+  .recent-row .recent-left{ display:flex; align-items:center; gap:8px; }
+  .recent-row svg{ width:16px; height:16px; flex:0 0 auto; }
+  .recent-row .chevron{ opacity:0.6; }
+  .recent-row button.link-pink{ background:none; border:none; font-family:inherit; font-size:inherit; }
+  .recent-row .view-all{ color: var(--paper-dim); text-decoration:none; }
+  .recent-row .view-all:hover{ color: var(--pink-glow); }
+
+  .recent-list{
+    width:100%;
+    max-width:560px;
+    display:none;
+    flex-direction:column;
+    gap:6px;
+    margin-top:-14px;
+  }
+  .recent-list.open{ display:flex; }
+  .recent-list button{
+    text-align:left;
+    background: rgba(255,255,255,0.03);
+    border:1px solid rgba(255,143,184,0.12);
+    color: var(--paper-dim);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    padding:9px 12px;
+    cursor:pointer;
+  }
+  .recent-list button:hover{ border-color: var(--pink); color: var(--paper); }
+
+  .new-batch-btn{
+    margin-left:auto;
+    align-self:flex-start;
+    background:none;
+    border:1px solid rgba(255,143,184,0.3);
+    color: var(--paper-dim);
+    font-family:'Big Shoulders Stencil', sans-serif;
+    font-size:12px;
+    letter-spacing:1px;
+    padding: 6px 12px;
+    cursor:pointer;
+    display:flex; align-items:center; gap:6px;
+  }
+  .new-batch-btn:hover{ border-color: var(--pink); color: var(--pink-glow); }
+  .new-batch-btn svg{ width:13px; height:13px; }
+
+  @media (max-width:480px){
+    .landing-secondary{ flex-wrap:wrap; }
+    .icon-btn.strong span{ display:none; }
+  }
+
+  /* ---------- header ---------- */
+  .lab-header{
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    gap: clamp(10px, 3vw, 16px);
+    padding: clamp(14px, 4vw, 20px) clamp(16px, 4vw, 22px);
+    border-bottom: 1px solid rgba(255,143,184,0.14);
+    flex: 0 0 auto;
+  }
+
+  .element-tile{
+    flex: 0 0 auto;
+    width: clamp(50px, 12vw, 62px);
+    height: clamp(50px, 12vw, 62px);
+    border: 2px solid var(--pink);
+    color: var(--pink);
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    padding: 4px 6px;
+    font-family:'Big Shoulders Stencil', sans-serif;
+    box-shadow: 0 0 18px -4px rgba(255,47,119,0.55), inset 0 0 12px -6px rgba(255,47,119,0.6);
+  }
+  .element-tile .num{ font-size:10px; letter-spacing:0.5px; opacity:0.85; }
+  .element-tile .sym{ font-size: clamp(20px, 5vw, 26px); font-weight:900; line-height:0.85; }
+  .element-tile .mass{ font-size:8px; letter-spacing:0.5px; opacity:0.7; }
+
+  .lab-header h1{
+    font-family:'Big Shoulders Stencil', sans-serif;
+    font-weight:900;
+    font-size: clamp(22px, 6vw, 30px);
+    letter-spacing: 1px;
+    margin:0;
+    color: var(--paper);
+    text-shadow: 0 0 22px rgba(255,47,119,0.35);
+  }
+
+  .status-row{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    margin-top:2px;
+    font-size:11px;
+    color: var(--paper-dim);
+  }
+  .status-dot{
+    width:7px; height:7px;
+    border-radius:50%;
+    background: var(--pink);
+    box-shadow: 0 0 7px 1px rgba(255,47,119,0.8);
+    animation: pulse-dot 1.8s ease-in-out infinite;
+  }
+  @keyframes pulse-dot{ 0%,100%{ opacity:1; } 50%{ opacity:0.4; } }
+
+  .purity-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:4px;
+    font-size:11px;
+    color: var(--paper-dim);
+  }
+  .purity-bar{
+    width:90px; height:5px;
+    background: rgba(255,255,255,0.08);
+    position:relative;
+    overflow:hidden;
+  }
+  .purity-bar > span{
+    position:absolute; inset:0;
+    width:99%;
+    background: linear-gradient(90deg, var(--pink-deep), var(--pink));
+    animation: shimmer 3.5s ease-in-out infinite;
+  }
+  @keyframes shimmer{
+    0%,100%{ filter:brightness(1); }
+    50%{ filter:brightness(1.35); }
+  }
+
+  /* ---------- chat body ---------- */
+  .chat-screen{ flex-direction:column; }
+  .chat{
+    padding: 16px clamp(12px, 4vw, 20px) 8px;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y:auto;
+    -webkit-overflow-scrolling: touch;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    background-image:
+      linear-gradient(180deg, rgba(255,47,119,0.03), transparent 200px);
+  }
+  .chat::-webkit-scrollbar{ width:8px; }
+  .chat::-webkit-scrollbar-thumb{ background: var(--pink-deep); }
+  .chat::-webkit-scrollbar-track{ background: transparent; }
+
+  .row{ display:flex; gap:10px; max-width: 90%; }
+  .row.user{ align-self:flex-end; flex-direction:row-reverse; }
+  .row.bot{ align-self:flex-start; }
+
+  @media (min-width:700px){
+    .row{ max-width: min(82%, 560px); }
+  }
+
+  .avatar{
+    flex:0 0 auto;
+    width:30px; height:30px;
+    border:1.5px solid var(--pink);
+    color:var(--pink);
+    font-family:'Big Shoulders Stencil', sans-serif;
+    font-weight:700;
+    font-size:13px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .row.user .avatar{ border-color: var(--paper-dim); color: var(--paper-dim); }
+
+  .bubble{
+    font-size:14.5px;
+    line-height:1.5;
+    padding: 10px 14px;
+    position:relative;
+    border-left: 3px solid var(--pink);
+    background: var(--asphalt-3);
+    border-radius: 3px 10px 10px 10px;
+    overflow-wrap:anywhere;
+  }
+  .row.user .bubble{
+    border-left:none;
+    border-right: 3px solid var(--paper-dim);
+    background: rgba(255,255,255,0.03);
+    border-radius: 10px 3px 10px 10px;
+  }
+
+  .answer-content p{ margin:0 0 10px; }
+  .answer-content p:last-child{ margin-bottom:0; }
+  .answer-content h3{
+    margin: 4px 0 8px;
+    color: var(--pink-glow);
+    font-family:'Big Shoulders Stencil', sans-serif;
+    font-size:16px;
+    letter-spacing:0.6px;
+    line-height:1.15;
+  }
+  .answer-content ul, .answer-content ol{
+    margin: 4px 0 11px 19px;
+    padding:0;
+  }
+  .answer-content li{ padding-left:3px; margin:4px 0; }
+  .answer-content li::marker{ color:var(--pink-glow); }
+  .answer-content strong{ color:var(--paper); font-weight:600; }
+  .answer-content em{ color:var(--pink-glow); }
+  .answer-content code{
+    color:var(--pink-glow);
+    background:rgba(255,143,184,0.08);
+    padding:1px 4px;
+    font-size:0.92em;
+  }
+
+  .tag-row{
+    display:flex;
+    align-items:baseline;
+    gap:8px;
+    margin-bottom:3px;
+  }
+  .row.user .tag-row{ flex-direction:row-reverse; }
+
+  .tag{
+    font-family:'Big Shoulders Stencil', sans-serif;
+    font-size:11px;
+    letter-spacing:1.5px;
+    color: var(--pink-glow);
+  }
+  .row.user .tag{ color: var(--paper-dim); }
+
+  .timestamp{
+    font-size:10px;
+    color: rgba(184,171,156,0.5);
+  }
+
+  .msg-images{
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+    gap:6px;
+    margin-top:8px;
+  }
+  .msg-images img{
+    width:100%;
+    height:84px;
+    object-fit:cover;
+    border: 1px solid rgba(255,143,184,0.3);
+    display:block;
+  }
+
+  .typing{
+    display:flex; gap:5px; align-items:center; padding: 6px 4px;
+  }
+  .typing span{
+    width:6px; height:6px; background:var(--pink);
+    animation: bounce 1.1s infinite ease-in-out;
+  }
+  .typing span:nth-child(2){ animation-delay:0.15s; }
+  .typing span:nth-child(3){ animation-delay:0.3s; }
+  @keyframes bounce{ 0%,60%,100%{ transform:translateY(0); opacity:0.5;} 30%{ transform:translateY(-4px); opacity:1;} }
+
+  /* ---------- input / batch log ---------- */
+  .batch-log{
+    border-top: 1px solid rgba(255,143,184,0.14);
+    padding: 14px clamp(12px, 4vw, 20px) calc(14px + env(safe-area-inset-bottom, 0px));
+    flex: 0 0 auto;
+  }
+  .batch-log .label{
+    font-family:'Big Shoulders Stencil', sans-serif;
+    font-size:12px;
+    letter-spacing:1.5px;
+    color: var(--paper-dim);
+    margin-bottom:8px;
+  }
+  .preview-strip{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-bottom:10px;
+  }
+  .preview-thumb{
+    position:relative;
+    width:52px; height:52px;
+    border: 1px solid var(--pink);
+    overflow:hidden;
+  }
+  .preview-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .preview-thumb button{
+    position:absolute;
+    top:0; right:0;
+    width:16px; height:16px;
+    background: var(--pink);
+    color: var(--asphalt);
+    border:none;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10px;
+    line-height:16px;
+    padding:0;
+    cursor:pointer;
+  }
+
+  .input-row{ display:flex; gap:10px; align-items:flex-end; }
+
+  .attach-btn{
+    flex:0 0 auto;
+    width:44px; height:44px;
+    background: transparent;
+    border: 1px solid rgba(255,143,184,0.35);
+    color: var(--pink-glow);
+    cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+  .attach-btn:hover{ border-color: var(--pink); color: var(--pink); }
+  .attach-btn svg{ width:18px; height:18px; }
+  .attach-btn:focus-visible{ outline: 2px solid var(--pink-glow); outline-offset:2px; }
+
+  .chat.drag-over{
+    background-color: rgba(255,47,119,0.06);
+    outline: 1px dashed var(--pink);
+    outline-offset: -6px;
+  }
+
+  textarea{
+    flex:1;
+    resize:none;
+    background: var(--asphalt);
+    border: 1px solid rgba(255,143,184,0.2);
+    color: var(--paper);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:14px;
+    padding: 11px 12px;
+    height:44px;
+    outline:none;
+  }
+  textarea:focus{
+    border-color: var(--pink);
+    box-shadow: 0 0 0 3px rgba(255,47,119,0.18);
+  }
+  textarea::placeholder{ color: rgba(184,171,156,0.55); font-style:italic; }
+
+  button.cook{
+    flex:0 0 auto;
+    background: var(--pink);
+    color: var(--asphalt);
+    border:none;
+    font-family:'Big Shoulders Stencil', sans-serif;
+    font-weight:900;
+    font-size:15px;
+    letter-spacing:1px;
+    padding: 0 20px;
+    cursor:pointer;
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+    transition: filter 0.15s ease, transform 0.15s ease;
+  }
+  button.cook:hover{ filter:brightness(1.15); }
+  button.cook:active{ transform: scale(0.97); }
+  button.cook:focus-visible, textarea:focus-visible{ outline: 2px solid var(--pink-glow); outline-offset:2px; }
+
+  @media (prefers-reduced-motion: reduce){
+    .purity-bar > span, .typing span, .status-dot{ animation:none; }
+  }
+
+  /* very small phones: tighten spacing further */
+  @media (max-width:360px){
+    .lab-header{ gap:10px; }
+    .attach-btn{ width:38px; height:38px; }
+    button.cook{ padding: 0 12px; font-size:12.5px; }
+    textarea{ font-size:13.5px; }
+  }
+
+  /* larger desktop screens: a little more room to breathe */
+  @media (min-width:1100px){
+    .app{ max-width: 1080px; height: min(820px, 88vh); }
+  }
+</style>
+</head>
+<body>
+
+<div class="app state-landing" id="app">
+
+  <!-- ================= LANDING / GREETING ================= -->
+  <div class="landing-screen">
+    <div class="landing-topline">
+      Not DEA. Probably.
+    </div>
+
+    <div class="greeting">
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--pink)" stroke-width="1.6" stroke-linecap="round">
+        <path d="M12 2v20M2 12h20M5 5l14 14M19 5L5 19M12 6v12M6 12h12"/>
+      </svg>
+      <h2>Yo.</h2>
+    </div>
+
+    <div class="landing-box-wrap">
+      <div class="landing-box">
+        <textarea id="landingInput" rows="2" placeholder="What's the problem?"></textarea>
+        <div class="landing-model-row"><span>PINKMAN</span></div>
+        <div class="landing-preview-strip" id="landingPreviewStrip"></div>
+        <div class="landing-secondary">
+          <span>Cook with photos, notes, and more</span>
+          <div class="icon-group">
+            <button class="icon-btn" id="cameraBtn" type="button" aria-label="Add photo" title="Add photo">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+            </button>
+            <button class="icon-btn strong" id="landingAttachBtn" type="button" aria-label="Add evidence">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21.44 11.05l-9.19 9.19a5 5 0 01-7.07-7.07l9.19-9.19a3.5 3.5 0 014.95 4.95l-9.2 9.19a1.5 1.5 0 01-2.12-2.12l8.49-8.48"/>
+              </svg>
+              <span>Add evidence</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      <button class="landing-send" id="landingSendBtn" type="button" aria-label="Start cook">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 19V5M5 12l7-7 7 7"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="recent-row">
+      <div class="recent-left">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--pink-glow)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/>
+        </svg>
+        <span>Your recent batches</span>
+        <span class="chevron">⌄</span>
+        <button class="link-pink" id="recentToggle" type="button">Show</button>
+      </div>
+      <a class="view-all" href="#" id="viewAllLink">View all →</a>
+    </div>
+    <div class="recent-list" id="recentList">
+      <button type="button" data-batch="Rate the purity on this last batch, straight up.">Purity check — 96.4% — 2 days ago</button>
+      <button type="button" data-batch="Walk me through fixing a busted RV generator.">RV generator repair — 5 days ago</button>
+    </div>
+  </div>
+
+  <!-- ================= CHAT ================= -->
+  <div class="chat-screen">
+    <div class="lab-header">
+      <div class="element-tile">
+        <span class="num">76</span>
+        <span class="sym">Pk</span>
+        <span class="mass">149.999</span>
+      </div>
+      <div>
+        <h1>PINKMAN</h1>
+        <div class="status-row">
+          <span class="status-dot"></span>
+          <span>online — responds in seconds</span>
+        </div>
+        <div class="purity-row">
+          <span>PURITY</span>
+          <div class="purity-bar"><span></span></div>
+          <span>99.1%</span>
+        </div>
+      </div>
+      <button class="new-batch-btn" id="newBatchBtn" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        New batch
+      </button>
+    </div>
+
+    <div class="chat" id="chat"></div>
+
+    <div class="batch-log">
+      <div class="label">NEW ENTRY</div>
+      <div class="preview-strip" id="previewStrip"></div>
+      <div class="input-row">
+        <input type="file" id="fileInput" accept="image/*" multiple hidden>
+        <button class="attach-btn" id="attachBtn" type="button" aria-label="Attach image" title="Attach image">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21.44 11.05l-9.19 9.19a5 5 0 01-7.07-7.07l9.19-9.19a3.5 3.5 0 014.95 4.95l-9.2 9.19a1.5 1.5 0 01-2.12-2.12l8.49-8.48"/>
+          </svg>
+        </button>
+        <textarea id="msgInput" placeholder="type your business... or attach a photo"></textarea>
+        <button class="cook" id="sendBtn">COOK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const appEl = document.getElementById('app');
+  const chat = document.getElementById('chat');
+  const input = document.getElementById('msgInput');
+  const sendBtn = document.getElementById('sendBtn');
+  const fileInput = document.getElementById('fileInput');
+  const attachBtn = document.getElementById('attachBtn');
+  const previewStrip = document.getElementById('previewStrip');
+  const landingInput = document.getElementById('landingInput');
+  const landingSendBtn = document.getElementById('landingSendBtn');
+  const landingPreviewStrip = document.getElementById('landingPreviewStrip');
+  const cameraBtn = document.getElementById('cameraBtn');
+  const landingAttachBtn = document.getElementById('landingAttachBtn');
+  const newBatchBtn = document.getElementById('newBatchBtn');
+  const recentToggle = document.getElementById('recentToggle');
+  const recentList = document.getElementById('recentList');
+  const viewAllLink = document.getElementById('viewAllLink');
+  let batchCount = 0;
+  let pendingImages = []; // { url }
+
+  function nowTime(){
+    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function addRow(text, isUser, images){
+    images = images || [];
+    const row = document.createElement('div');
+    row.className = 'row ' + (isUser ? 'user' : 'bot');
+
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar';
+    avatar.textContent = isUser ? 'U' : 'Pk';
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+
+    const tagRow = document.createElement('div');
+    tagRow.className = 'tag-row';
+
+    const tag = document.createElement('span');
+    tag.className = 'tag';
+    if(isUser){
+      tag.textContent = 'YOU';
+    } else {
+      batchCount++;
+      tag.textContent = 'BATCH #' + String(batchCount).padStart(3,'0');
+    }
+    const time = document.createElement('span');
+    time.className = 'timestamp';
+    time.textContent = nowTime();
+
+    tagRow.appendChild(tag);
+    tagRow.appendChild(time);
+    bubble.appendChild(tagRow);
+
+    if(text){
+      const content = document.createElement('div');
+      content.className = isUser ? 'answer-content user-content' : 'answer-content';
+      renderAnswer(text, content);
+      bubble.appendChild(content);
+    }
+
+    if(images.length){
+      const grid = document.createElement('div');
+      grid.className = 'msg-images';
+      images.forEach(img => {
+        const el = document.createElement('img');
+        el.src = img.url;
+        el.alt = 'attached image';
+        grid.appendChild(el);
+      });
+      bubble.appendChild(grid);
+    }
+
+    row.appendChild(avatar);
+    row.appendChild(bubble);
+    chat.appendChild(row);
+    chat.scrollTop = chat.scrollHeight;
+    return row;
+  }
+
+  function appendInlineText(parent, text){
+    const tokenPattern = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g;
+    let cursor = 0;
+    let match;
+    while((match = tokenPattern.exec(text))){
+      if(match.index > cursor){
+        parent.appendChild(document.createTextNode(text.slice(cursor, match.index)));
+      }
+      const token = match[0];
+      const element = token.startsWith('`') ? document.createElement('code')
+        : token.startsWith('**') ? document.createElement('strong')
+        : document.createElement('em');
+      element.textContent = token.replace(/^\*\*?|\*\*?$|`/g, '');
+      parent.appendChild(element);
+      cursor = match.index + token.length;
+    }
+    if(cursor < text.length){
+      parent.appendChild(document.createTextNode(text.slice(cursor)));
+    }
+  }
+
+  function renderAnswer(text, container){
+    let list = null;
+    let listType = '';
+
+    function closeList(){
+      if(list){
+        container.appendChild(list);
+        list = null;
+        listType = '';
+      }
+    }
+
+    text.replace(/\r\n?/g, '\n').split('\n').forEach(line => {
+      const trimmed = line.trim();
+      if(!trimmed){
+        closeList();
+        return;
+      }
+
+      const heading = trimmed.match(/^#{1,3}\s+(.+)$/);
+      if(heading){
+        closeList();
+        const element = document.createElement('h3');
+        appendInlineText(element, heading[1]);
+        container.appendChild(element);
+        return;
+      }
+
+      const bullet = trimmed.match(/^[-*]\s+(.+)$/);
+      const numbered = trimmed.match(/^\d+[.)]\s+(.+)$/);
+      if(bullet || numbered){
+        const nextType = bullet ? 'ul' : 'ol';
+        if(!list || listType !== nextType){
+          closeList();
+          list = document.createElement(nextType);
+          listType = nextType;
+        }
+        const item = document.createElement('li');
+        appendInlineText(item, (bullet || numbered)[1]);
+        list.appendChild(item);
+        return;
+      }
+
+      closeList();
+      const paragraph = document.createElement('p');
+      appendInlineText(paragraph, trimmed);
+      container.appendChild(paragraph);
+    });
+    closeList();
+  }
+
+  function showTyping(){
+    const row = document.createElement('div');
+    row.className = 'row bot';
+    row.id = 'typingRow';
+
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar';
+    avatar.textContent = 'Pk';
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble typing';
+    bubble.innerHTML = '<span></span><span></span><span></span>';
+
+    row.appendChild(avatar);
+    row.appendChild(bubble);
+    chat.appendChild(row);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  const replies = [
+    "Straight up — here's how I'd handle that.",
+    "Simple as that. Next question.",
+    "That's the pure stuff right there, no cutting corners.",
+    "Give me a sec... alright, here's the play.",
+    "You want it done right, this is how."
+  ];
+  const imageReplies = [
+    "Got the photo — that checks out, here's what I'd do.",
+    "Looking at the image now. Here's my read on it.",
+    "Nice and clear. Based on that photo, here's the move."
+  ];
+
+  function renderPreviews(){
+    [previewStrip, landingPreviewStrip].forEach(strip => {
+      if(!strip) return;
+      strip.innerHTML = '';
+      pendingImages.forEach((img, i) => {
+        const thumb = document.createElement('div');
+        thumb.className = 'preview-thumb';
+
+        const el = document.createElement('img');
+        el.src = img.url;
+        el.alt = 'pending attachment';
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.textContent = '×';
+        removeBtn.setAttribute('aria-label', 'Remove image');
+        removeBtn.addEventListener('click', () => {
+          pendingImages.splice(i, 1);
+          renderPreviews();
+          updateLandingSendState();
+        });
+
+        thumb.appendChild(el);
+        thumb.appendChild(removeBtn);
+        strip.appendChild(thumb);
+      });
+    });
+  }
+
+  function handleFiles(fileList){
+    Array.from(fileList).forEach(file => {
+      if(!file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        pendingImages.push({ url: e.target.result });
+        renderPreviews();
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  attachBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', (e) => {
+    handleFiles(e.target.files);
+    fileInput.value = '';
+  });
+
+  ['dragover'].forEach(evt => {
+    chat.addEventListener(evt, (e) => {
+      e.preventDefault();
+      chat.classList.add('drag-over');
+    });
+  });
+  ['dragleave', 'drop'].forEach(evt => {
+    chat.addEventListener(evt, (e) => {
+      e.preventDefault();
+      chat.classList.remove('drag-over');
+    });
+  });
+  chat.addEventListener('drop', (e) => {
+    if(e.dataTransfer && e.dataTransfer.files.length){
+      handleFiles(e.dataTransfer.files);
+    }
+  });
+
+  function send(){
+    const text = input.value.trim();
+    if(!text && pendingImages.length === 0) return;
+
+    const imagesToSend = pendingImages.slice();
+    addRow(text, true, imagesToSend);
+    input.value = '';
+    pendingImages = [];
+    renderPreviews();
+    showTyping();
+    requestChemistry(text, imagesToSend);
+  }
+
+  sendBtn.addEventListener('click', send);
+  input.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter' && !e.shiftKey){
+      e.preventDefault();
+      send();
+    }
+  });
+
+  /* ---------- screen switching: landing greeting <-> chat ---------- */
+  function showLanding(){
+    appEl.classList.remove('state-chat');
+    appEl.classList.add('state-landing');
+  }
+  function showChatScreen(){
+    appEl.classList.remove('state-landing');
+    appEl.classList.add('state-chat');
+  }
+
+  function seedChat(){
+    chat.innerHTML = '';
+    batchCount = 0;
+    addRow("Yo. Talk to me — what's the problem, and I'll cook up an answer. Drop a photo in too if it helps explain it.", false);
+  }
+  seedChat();
+
+  function startChat(text, images){
+    showChatScreen();
+    seedChat();
+    if(text || images.length){
+      addRow(text, true, images);
+      showTyping();
+      requestChemistry(text, images);
+    }
+  }
+
+  async function requestChemistry(text, images){
+    const body = new FormData();
+    body.append('question', text || 'Analyze the attached chemistry image.');
+    if(images.length){
+      const response = await fetch(images[0].url);
+      const blob = await response.blob();
+      body.append('image', blob, 'chemistry-image.' + (blob.type.split('/')[1] || 'jpg'));
+    }
+
+    try{
+      const response = await fetch('/api/chemistry', { method:'POST', body });
+      const result = await response.json();
+      if(!response.ok) throw new Error(result.error || 'The chemistry service failed.');
+      const typingRow = document.getElementById('typingRow');
+      if(typingRow) typingRow.remove();
+      addRow(result.answer, false);
+    }catch(error){
+      const typingRow = document.getElementById('typingRow');
+      if(typingRow) typingRow.remove();
+      addRow('Could not reach the chemistry assistant: ' + error.message, false);
+    }
+  }
+
+  function updateLandingSendState(){
+    const hasContent = landingInput.value.trim().length > 0 || pendingImages.length > 0;
+    landingSendBtn.classList.toggle('active', hasContent);
+  }
+
+  function launchFromLanding(){
+    const text = landingInput.value.trim();
+    if(!text && pendingImages.length === 0) return;
+    const imagesToSend = pendingImages.slice();
+    startChat(text, imagesToSend);
+    landingInput.value = '';
+    pendingImages = [];
+    renderPreviews();
+    updateLandingSendState();
+  }
+
+  landingInput.addEventListener('input', updateLandingSendState);
+  landingInput.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter' && !e.shiftKey){
+      e.preventDefault();
+      launchFromLanding();
+    }
+  });
+  landingSendBtn.addEventListener('click', launchFromLanding);
+
+  cameraBtn.addEventListener('click', () => fileInput.click());
+  landingAttachBtn.addEventListener('click', () => fileInput.click());
+
+  newBatchBtn.addEventListener('click', () => {
+    input.value = '';
+    landingInput.value = '';
+    pendingImages = [];
+    renderPreviews();
+    updateLandingSendState();
+    showLanding();
+  });
+
+  recentToggle.addEventListener('click', () => {
+    const open = recentList.classList.toggle('open');
+    recentToggle.textContent = open ? 'Hide' : 'Show';
+  });
+
+  recentList.querySelectorAll('button[data-batch]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      landingInput.value = btn.getAttribute('data-batch');
+      updateLandingSendState();
+      landingInput.focus();
+    });
+  });
+
+  viewAllLink.addEventListener('click', (e) => e.preventDefault());
+
+  /* file input also needs to refresh the landing send-button state */
+  fileInput.addEventListener('change', updateLandingSendState);
+</script>
+
+</body>
+</html>

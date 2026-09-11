@@ -1,11 +1,5 @@
 {
   "version": 2,
-  "rewrites": [
-    {
-      "source": "/",
-      "destination": "/pinkman-chat_1.html"
-    }
-  ],
   "headers": [
     {
       "source": "/(.*)",
