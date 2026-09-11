@@ -1,0 +1,7 @@
+google-genai
+python-pptx
+streamlit
+matplotlib
+openpyxl
+pandas
+Pillow
