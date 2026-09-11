@@ -209,6 +209,44 @@
   .landing-send.active{ opacity:1; pointer-events:auto; transform:scale(1); }
   .landing-send svg{ width:15px; height:15px; }
 
+  .mechanism-screen{
+    flex:1 1 auto;
+    min-height:0;
+    width:100%;
+    display:none;
+    flex-direction:column;
+    overflow:hidden;
+  }
+  .app.state-mechanism .mechanism-screen{ display:flex; }
+  .app.state-mechanism .landing-screen,
+  .app.state-mechanism .chat-screen{ display:none; }
+  .mechanism-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:16px clamp(12px,4vw,20px);
+    border-bottom:1px solid rgba(255,143,184,0.14);
+  }
+  .mechanism-header h2{ margin:0; font-family:'Big Shoulders Stencil',sans-serif; letter-spacing:1px; }
+  .mechanism-header p{ margin:3px 0 0; color:var(--paper-dim); font-size:11px; }
+  .mechanism-tools{ display:flex; gap:7px; flex-wrap:wrap; padding:10px clamp(12px,4vw,20px); border-bottom:1px solid rgba(255,143,184,0.1); }
+  .mechanism-tools button, .mechanism-actions button{
+    border:1px solid rgba(255,143,184,0.28); background:var(--asphalt-3); color:var(--paper); padding:7px 9px; cursor:pointer; font:11px 'IBM Plex Mono',monospace;
+  }
+  .mechanism-tools button.active, .mechanism-tools button:hover, .mechanism-actions button:hover{ border-color:var(--pink); color:var(--pink-glow); }
+  .mechanism-workspace{ flex:1; min-height:0; overflow:auto; padding:12px; }
+  .mechanism-canvas-wrap{ position:relative; min-height:340px; height:min(52vh,460px); border:1px solid rgba(255,143,184,0.2); background-color:var(--asphalt); background-image:linear-gradient(rgba(255,255,255,0.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.05) 1px,transparent 1px); background-size:24px 24px; }
+  .mechanism-canvas{ width:100%; height:100%; touch-action:none; user-select:none; }
+  .mechanism-canvas .bond{ stroke:var(--paper); stroke-width:3; }
+  .mechanism-canvas .atom{ fill:var(--asphalt-3); stroke:var(--pink-glow); stroke-width:2; cursor:grab; }
+  .mechanism-canvas .atom.selected{ stroke:var(--hazard); stroke-width:3; }
+  .mechanism-canvas text{ fill:var(--paper); font:600 14px 'IBM Plex Mono',monospace; text-anchor:middle; dominant-baseline:middle; pointer-events:none; }
+  .mechanism-canvas .electron-arrow{ fill:none; stroke:var(--hazard); stroke-width:2.5; marker-end:url(#arrowhead); }
+  .mechanism-status{ min-height:22px; padding:8px 2px; color:var(--paper-dim); font-size:12px; }
+  .mechanism-actions{ display:flex; gap:8px; flex-wrap:wrap; padding-top:4px; }
+  .mechanism-actions .primary{ background:var(--pink); color:var(--asphalt); border-color:var(--pink); font-weight:700; }
+
   .landing-box-wrap{ position:relative; width:100%; max-width:560px; }
 
   .landing-preview-strip{
@@ -638,6 +676,7 @@
               </svg>
               <span>Add evidence</span>
             </button>
+            <button class="icon-btn strong" id="mechanismBtn" type="button" aria-label="Open mechanism lab">Mechanism lab</button>
           </div>
         </div>
       </div>
@@ -662,6 +701,31 @@
     <div class="recent-list" id="recentList">
       <button type="button" data-batch="Rate the purity on this last batch, straight up.">Purity check — 96.4% — 2 days ago</button>
       <button type="button" data-batch="Walk me through fixing a busted RV generator.">RV generator repair — 5 days ago</button>
+    </div>
+  </div>
+
+  <div class="mechanism-screen">
+    <div class="mechanism-header">
+      <div><h2>MECHANISM LAB</h2><p>Draw the atoms. Place the electron arrow. Pinkman explains the chemistry.</p></div>
+      <button class="new-batch-btn" id="closeMechanismBtn" type="button">Back</button>
+    </div>
+    <div class="mechanism-tools">
+      <button type="button" data-template="sn2">SN2 template</button>
+      <button type="button" data-template="acid-base">Acid-base template</button>
+      <button type="button" data-tool="select" class="active">Select</button>
+      <button type="button" data-tool="atom">Add atom</button>
+      <button type="button" data-tool="bond">Add bond</button>
+      <button type="button" data-tool="arrow">Curved arrow</button>
+      <button type="button" id="clearMechanismBtn">Clear</button>
+    </div>
+    <div class="mechanism-workspace">
+      <div class="mechanism-canvas-wrap"><svg class="mechanism-canvas" id="mechanismCanvas" viewBox="0 0 900 460" aria-label="Mechanism drawing canvas"></svg></div>
+      <div class="mechanism-status" id="mechanismStatus">Choose a template or add atoms to begin.</div>
+      <div class="mechanism-actions">
+        <button type="button" id="validateMechanismBtn">Validate drawing</button>
+        <button type="button" class="primary" id="explainMechanismBtn">Ask Pinkman to explain</button>
+        <button type="button" id="exportMechanismBtn">Export SVG</button>
+      </div>
     </div>
   </div>
 
@@ -724,14 +788,146 @@
   const cameraBtn = document.getElementById('cameraBtn');
   const landingAttachBtn = document.getElementById('landingAttachBtn');
   const newBatchBtn = document.getElementById('newBatchBtn');
+  const mechanismBtn = document.getElementById('mechanismBtn');
+  const closeMechanismBtn = document.getElementById('closeMechanismBtn');
+  const mechanismCanvas = document.getElementById('mechanismCanvas');
+  const mechanismStatus = document.getElementById('mechanismStatus');
+  const clearMechanismBtn = document.getElementById('clearMechanismBtn');
+  const validateMechanismBtn = document.getElementById('validateMechanismBtn');
+  const explainMechanismBtn = document.getElementById('explainMechanismBtn');
+  const exportMechanismBtn = document.getElementById('exportMechanismBtn');
   const recentToggle = document.getElementById('recentToggle');
   const recentList = document.getElementById('recentList');
   const viewAllLink = document.getElementById('viewAllLink');
   let batchCount = 0;
   let pendingImages = []; // { url }
+  let mechanismTool = 'select';
+  let mechanism = { atoms: [], bonds: [], arrows: [] };
+  let atomCounter = 0;
+  let selectedAtom = null;
+  let dragAtom = null;
 
   function nowTime(){
     return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function showMechanism(){
+    appEl.classList.remove('state-landing','state-chat');
+    appEl.classList.add('state-mechanism');
+    renderMechanism();
+  }
+
+  function addMechanismAtom(element, x, y){
+    const atom = { id:'atom-' + (++atomCounter), element, x, y };
+    mechanism.atoms.push(atom);
+    selectedAtom = atom.id;
+    renderMechanism();
+    return atom;
+  }
+
+  function loadMechanismTemplate(name){
+    mechanism = { atoms:[], bonds:[], arrows:[] };
+    atomCounter = 0;
+    if(name === 'sn2'){
+      const carbon = addMechanismAtom('C', 360, 230);
+      const bromine = addMechanismAtom('Br', 520, 230);
+      const hydroxide = addMechanismAtom('O⁻', 180, 230);
+      mechanism.bonds.push({ from:carbon.id, to:bromine.id, order:1 });
+      mechanism.arrows.push({ from:hydroxide.id, to:carbon.id, bend:-80 });
+      mechanismStatus.textContent = 'SN2 setup: the arrow should start at the nucleophile and end at the electrophilic carbon.';
+    }else{
+      const oxygen = addMechanismAtom('O', 350, 200);
+      const hydrogen = addMechanismAtom('H', 500, 200);
+      const base = addMechanismAtom('B⁻', 200, 300);
+      mechanism.bonds.push({ from:oxygen.id, to:hydrogen.id, order:1 });
+      mechanism.arrows.push({ from:base.id, to:hydrogen.id, bend:-70 });
+      mechanismStatus.textContent = 'Acid-base setup: check the proton-transfer arrow before asking for an explanation.';
+    }
+    selectedAtom = null;
+    renderMechanism();
+  }
+
+  function atomById(id){ return mechanism.atoms.find(atom => atom.id === id); }
+
+  function renderMechanism(){
+    if(!mechanismCanvas) return;
+    mechanismCanvas.innerHTML = '<defs><marker id="arrowhead" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="var(--hazard)"/></marker></defs>';
+    mechanism.bonds.forEach(bond => {
+      const from = atomById(bond.from), to = atomById(bond.to);
+      if(!from || !to) return;
+      const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+      line.classList.add('bond'); line.setAttribute('x1',from.x); line.setAttribute('y1',from.y); line.setAttribute('x2',to.x); line.setAttribute('y2',to.y);
+      mechanismCanvas.appendChild(line);
+    });
+    mechanism.arrows.forEach(arrow => {
+      const from = atomById(arrow.from), to = atomById(arrow.to);
+      if(!from || !to) return;
+      const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+      const midX = (from.x + to.x) / 2, midY = (from.y + to.y) / 2 + (arrow.bend || -60);
+      path.classList.add('electron-arrow'); path.setAttribute('d',`M ${from.x} ${from.y} Q ${midX} ${midY} ${to.x} ${to.y}`);
+      mechanismCanvas.appendChild(path);
+    });
+    mechanism.atoms.forEach(atom => {
+      const group = document.createElementNS('http://www.w3.org/2000/svg','g');
+      const circle = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      circle.classList.add('atom'); if(atom.id === selectedAtom) circle.classList.add('selected');
+      circle.setAttribute('cx',atom.x); circle.setAttribute('cy',atom.y); circle.setAttribute('r',24);
+      circle.dataset.atomId = atom.id;
+      const label = document.createElementNS('http://www.w3.org/2000/svg','text'); label.setAttribute('x',atom.x); label.setAttribute('y',atom.y); label.textContent = atom.element;
+      group.appendChild(circle); group.appendChild(label); mechanismCanvas.appendChild(group);
+    });
+  }
+
+  function mechanismPoint(event){
+    const rect = mechanismCanvas.getBoundingClientRect();
+    return { x:(event.clientX - rect.left) * 900 / rect.width, y:(event.clientY - rect.top) * 460 / rect.height };
+  }
+
+  function mechanismAtomAt(point){
+    return mechanism.atoms.find(atom => Math.hypot(atom.x-point.x, atom.y-point.y) < 30);
+  }
+
+  function mechanismClick(event){
+    const point = mechanismPoint(event); const atom = mechanismAtomAt(point);
+    if(mechanismTool === 'atom'){ addMechanismAtom('C', point.x, point.y); return; }
+    if(!atom){ selectedAtom = null; renderMechanism(); return; }
+    if(mechanismTool === 'bond' || mechanismTool === 'arrow'){
+      if(!selectedAtom){ selectedAtom = atom.id; renderMechanism(); return; }
+      if(selectedAtom === atom.id) return;
+      if(mechanismTool === 'bond') mechanism.bonds.push({ from:selectedAtom, to:atom.id, order:1 });
+      else mechanism.arrows.push({ from:selectedAtom, to:atom.id, bend:-60 });
+      selectedAtom = null; renderMechanism(); return;
+    }
+    selectedAtom = atom.id; renderMechanism();
+  }
+
+  function mechanismPointerDown(event){
+    const atom = mechanismAtomAt(mechanismPoint(event));
+    if(mechanismTool === 'select' && atom){ dragAtom = atom; mechanismCanvas.setPointerCapture(event.pointerId); }
+  }
+  function mechanismPointerMove(event){
+    if(!dragAtom) return; const point = mechanismPoint(event); dragAtom.x=point.x; dragAtom.y=point.y; renderMechanism();
+  }
+  function mechanismPointerUp(){ dragAtom=null; }
+
+  function validateMechanism(){
+    const issues=[];
+    if(mechanism.atoms.length < 2) issues.push('Add at least two atoms.');
+    mechanism.bonds.forEach(bond => { if(!atomById(bond.from) || !atomById(bond.to)) issues.push('A bond references a missing atom.'); });
+    mechanism.arrows.forEach(arrow => { if(!atomById(arrow.from) || !atomById(arrow.to)) issues.push('An arrow references a missing atom.'); });
+    mechanismStatus.textContent = issues.length ? 'Needs work: ' + issues.join(' ') : 'Structure is internally connected. Confirm valence, charges, and arrow direction chemically.';
+    return !issues.length;
+  }
+
+  function explainMechanism(){
+    if(!validateMechanism()) return;
+    const question = 'Explain this proposed mechanism. Treat this structured drawing as the source of truth. Check atom roles, bond changes, electron-arrow direction, charge balance, and any missing information. Structure: ' + JSON.stringify(mechanism);
+    showChatScreen(); seedChat(); addRow(question, true); showTyping(); requestChemistry(question, []);
+  }
+
+  function exportMechanism(){
+    const blob = new Blob([new XMLSerializer().serializeToString(mechanismCanvas)], {type:'image/svg+xml'});
+    const link = document.createElement('a'); link.href=URL.createObjectURL(blob); link.download='pinkman-mechanism.svg'; link.click(); URL.revokeObjectURL(link.href);
   }
 
   function addRow(text, isUser, images){
@@ -1031,11 +1227,11 @@
 
   /* ---------- screen switching: landing greeting <-> chat ---------- */
   function showLanding(){
-    appEl.classList.remove('state-chat');
+    appEl.classList.remove('state-chat','state-mechanism');
     appEl.classList.add('state-landing');
   }
   function showChatScreen(){
-    appEl.classList.remove('state-landing');
+    appEl.classList.remove('state-landing','state-mechanism');
     appEl.classList.add('state-chat');
   }
 
@@ -1220,6 +1416,26 @@
     updateLandingSendState();
     showLanding();
   });
+
+  mechanismBtn.addEventListener('click', showMechanism);
+  closeMechanismBtn.addEventListener('click', showLanding);
+  mechanismCanvas.addEventListener('click', mechanismClick);
+  mechanismCanvas.addEventListener('pointerdown', mechanismPointerDown);
+  mechanismCanvas.addEventListener('pointermove', mechanismPointerMove);
+  mechanismCanvas.addEventListener('pointerup', mechanismPointerUp);
+  mechanismCanvas.addEventListener('pointercancel', mechanismPointerUp);
+  document.querySelectorAll('[data-tool]').forEach(button => {
+    button.addEventListener('click', () => {
+      mechanismTool = button.dataset.tool;
+      document.querySelectorAll('[data-tool]').forEach(item => item.classList.toggle('active', item === button));
+      mechanismStatus.textContent = mechanismTool === 'bond' ? 'Select two atoms to connect them with a bond.' : mechanismTool === 'arrow' ? 'Select the electron source first, then the electron sink.' : mechanismTool === 'atom' ? 'Click the canvas to add a carbon atom.' : 'Drag atoms to position them precisely.';
+    });
+  });
+  document.querySelectorAll('[data-template]').forEach(button => button.addEventListener('click', () => loadMechanismTemplate(button.dataset.template)));
+  clearMechanismBtn.addEventListener('click', () => { mechanism={atoms:[],bonds:[],arrows:[]}; selectedAtom=null; mechanismStatus.textContent='Canvas cleared.'; renderMechanism(); });
+  validateMechanismBtn.addEventListener('click', validateMechanism);
+  explainMechanismBtn.addEventListener('click', explainMechanism);
+  exportMechanismBtn.addEventListener('click', exportMechanism);
 
   recentToggle.addEventListener('click', () => {
     const open = recentList.classList.toggle('open');
