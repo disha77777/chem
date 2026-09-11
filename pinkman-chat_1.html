@@ -1009,16 +1009,16 @@
   }
 
   async function requestChemistry(text, images){
-    const body = new FormData();
-    body.append('question', text || 'Analyze the attached chemistry image.');
-    if(images.length){
-      const response = await fetch(images[0].url);
-      const blob = await response.blob();
-      const optimized = await optimizeImage(blob);
-      body.append('image', optimized, 'chemistry-image.jpg');
-    }
-
     try{
+      const body = new FormData();
+      body.append('question', text || 'Analyze the attached chemistry image.');
+      if(images.length){
+        const response = await fetch(images[0].url);
+        const blob = await response.blob();
+        const optimized = await optimizeImage(blob);
+        body.append('image', optimized || blob, 'chemistry-image.jpg');
+      }
+
       const response = await fetch('/api/chemistry/stream', { method:'POST', body });
       if(!response.ok){
         const result = await response.json();
@@ -1028,6 +1028,7 @@
       const typingRow = document.getElementById('typingRow');
       if(typingRow) typingRow.remove();
       const answerRow = addRow('', false);
+      if(!response.body) throw new Error('The response stream was unavailable.');
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
@@ -1079,7 +1080,16 @@
           }
         });
       }
+      if(buffer.trim()){
+        const line = buffer.split('\n').find(item => item.startsWith('data: '));
+        if(line){
+          const result = JSON.parse(line.slice(6));
+          if(result.error) throw new Error(result.error);
+          if(result.text) queueText(result.text);
+        }
+      }
       await waitForTyping();
+      if(!answer.trim()) throw new Error('The chemistry assistant returned no text.');
     }catch(error){
       const typingRow = document.getElementById('typingRow');
       if(typingRow) typingRow.remove();
@@ -1089,6 +1099,7 @@
 
   async function optimizeImage(blob){
     if(!blob.type.startsWith('image/')) return blob;
+    if(typeof createImageBitmap !== 'function') return blob;
     const source = await createImageBitmap(blob);
     const maxDimension = 1600;
     const scale = Math.min(1, maxDimension / Math.max(source.width, source.height));
