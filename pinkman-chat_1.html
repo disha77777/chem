@@ -1018,7 +1018,8 @@
     if(images.length){
       const response = await fetch(images[0].url);
       const blob = await response.blob();
-      body.append('image', blob, 'chemistry-image.' + (blob.type.split('/')[1] || 'jpg'));
+      const optimized = await optimizeImage(blob);
+      body.append('image', optimized, 'chemistry-image.jpg');
     }
 
     try{
@@ -1058,6 +1059,19 @@
       if(typingRow) typingRow.remove();
       addRow('Could not reach the chemistry assistant: ' + error.message, false);
     }
+  }
+
+  async function optimizeImage(blob){
+    if(!blob.type.startsWith('image/')) return blob;
+    const source = await createImageBitmap(blob);
+    const maxDimension = 1600;
+    const scale = Math.min(1, maxDimension / Math.max(source.width, source.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(source.width * scale));
+    canvas.height = Math.max(1, Math.round(source.height * scale));
+    canvas.getContext('2d').drawImage(source, 0, 0, canvas.width, canvas.height);
+    source.close();
+    return await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.82));
   }
 
   function updateLandingSendState(){

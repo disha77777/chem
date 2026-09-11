@@ -61,6 +61,29 @@ User Question: {question or "Explain the chemistry concept I asked about."}"""
     return response.text
 
 
+def save_normalized_image(image):
+    """Validate and resize an uploaded image before sending it to Gemini."""
+    if image.mimetype not in {"image/jpeg", "image/png", "image/webp"}:
+        raise ValueError("Only JPEG, PNG, and WebP images are supported.")
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as temporary_file:
+        image.save(temporary_file)
+        temporary_path = temporary_file.name
+
+    try:
+        with Image.open(temporary_path) as uploaded_image:
+            uploaded_image.verify()
+        with Image.open(temporary_path) as uploaded_image:
+            normalized = uploaded_image.convert("RGB")
+            normalized.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
+            normalized.save(temporary_path, format="JPEG", quality=82, optimize=True)
+    except (UnidentifiedImageError, OSError):
+        Path(temporary_path).unlink(missing_ok=True)
+        raise
+
+    return temporary_path
+
+
 def stream_chemistry_answer(question, image_path=None):
     """Yield Gemini output chunks for progressive display in the chat UI."""
     api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
@@ -86,6 +109,8 @@ User Question: {question or "Analyze the chemistry question or image."}"""
             ):
                 if chunk.text:
                     yield chunk.text
+
+
     else:
         for chunk in client.models.generate_content_stream(
             model="gemini-3.1-flash-lite",
@@ -121,16 +146,10 @@ def chemistry():
 
     try:
         if image and image.filename:
-            if image.mimetype not in {"image/jpeg", "image/png", "image/webp"}:
-                return jsonify({"error": "Only JPEG, PNG, and WebP images are supported."}), 415
-
-            suffix = ".jpg" if image.mimetype == "image/jpeg" else f".{image.mimetype.split('/')[-1]}"
-            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temporary_file:
-                image.save(temporary_file)
-                temporary_path = temporary_file.name
-
-            with Image.open(temporary_path) as uploaded_image:
-                uploaded_image.verify()
+            try:
+                temporary_path = save_normalized_image(image)
+            except ValueError as error:
+                return jsonify({"error": str(error)}), 415
 
         if temporary_path:
             answer = analyze_chemistry_image(temporary_path, question)
@@ -161,19 +180,11 @@ def chemistry_stream():
     image = request.files.get("image")
     temporary_path = None
     if image and image.filename:
-        if image.mimetype not in {"image/jpeg", "image/png", "image/webp"}:
-            return jsonify({"error": "Only JPEG, PNG, and WebP images are supported."}), 415
-
-        suffix = ".jpg" if image.mimetype == "image/jpeg" else f".{image.mimetype.split('/')[-1]}"
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temporary_file:
-            image.save(temporary_file)
-            temporary_path = temporary_file.name
-
         try:
-            with Image.open(temporary_path) as uploaded_image:
-                uploaded_image.verify()
+            temporary_path = save_normalized_image(image)
+        except ValueError as error:
+            return jsonify({"error": str(error)}), 415
         except (UnidentifiedImageError, OSError):
-            Path(temporary_path).unlink(missing_ok=True)
             return jsonify({"error": "The uploaded file is not a valid supported image."}), 400
 
     def events():
