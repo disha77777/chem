@@ -784,8 +784,13 @@
   }
 
   function updateAnswerRow(row, text){
-    const content = row.querySelector('.answer-content');
-    if(!content) return;
+    let content = row.querySelector('.answer-content');
+    if(!content){
+      const bubble = row.querySelector('.bubble');
+      content = document.createElement('div');
+      content.className = 'answer-content';
+      bubble.appendChild(content);
+    }
     content.replaceChildren();
     renderAnswer(text, content);
     chat.scrollTop = chat.scrollHeight;
