@@ -434,6 +434,14 @@
     padding:1px 4px;
     font-size:0.92em;
   }
+  .chem-formula{
+    display:inline-block;
+    color:var(--paper);
+    font-family:Georgia, serif;
+    font-size:1.04em;
+    white-space:nowrap;
+  }
+  .chem-formula sub, .chem-formula sup{ font-size:0.72em; line-height:0; }
 
   .tag-row{
     display:flex;
@@ -797,7 +805,7 @@
   }
 
   function appendInlineText(parent, text){
-    const tokenPattern = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g;
+    const tokenPattern = /(\\ce\{[^}]+\}|\$[^$]+\$|\\\([^)]*\)|\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g;
     let cursor = 0;
     let match;
     while((match = tokenPattern.exec(text))){
@@ -805,6 +813,11 @@
         parent.appendChild(document.createTextNode(text.slice(cursor, match.index)));
       }
       const token = match[0];
+      if(token.startsWith('\\ce{') || token.startsWith('$') || token.startsWith('\\(')){
+        parent.appendChild(formatFormula(token));
+        cursor = match.index + token.length;
+        continue;
+      }
       const element = token.startsWith('`') ? document.createElement('code')
         : token.startsWith('**') ? document.createElement('strong')
         : document.createElement('em');
@@ -815,6 +828,36 @@
     if(cursor < text.length){
       parent.appendChild(document.createTextNode(text.slice(cursor)));
     }
+  }
+
+  function formatFormula(token){
+    const formula = document.createElement('span');
+    formula.className = 'chem-formula';
+    let value = token.startsWith('\\ce{') ? token.slice(4, -1)
+      : token.startsWith('\\(') ? token.slice(2, -2) : token.slice(1, -1);
+    value = value.replace(/\\text\{([^}]+)\}/g, '$1');
+    let index = 0;
+    while(index < value.length){
+      const marker = value[index];
+      if(marker === '_' || marker === '^'){
+        const tag = document.createElement(marker === '_' ? 'sub' : 'sup');
+        index++;
+        if(value[index] === '{'){
+          const end = value.indexOf('}', index);
+          tag.textContent = end === -1 ? value.slice(index + 1) : value.slice(index + 1, end);
+          index = end === -1 ? value.length : end + 1;
+        }else{
+          tag.textContent = value[index] || '';
+          index++;
+        }
+        formula.appendChild(tag);
+        continue;
+      }
+      const text = document.createTextNode(value[index]);
+      formula.appendChild(text);
+      index++;
+    }
+    return formula;
   }
 
   function renderAnswer(text, container){

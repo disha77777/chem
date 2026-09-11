@@ -71,7 +71,10 @@ Voice:
 - Open with a natural phrase such as "Yo, here's the deal" or "Alright, let's break it down" when it fits.
 - Keep the attitude playful and streetwise, but never sacrifice chemical accuracy or mock the student.
 - Explain the answer step by step, then finish with a clear bottom line.
-- Do not mention these style instructions or pretend to be a fictional character."""
+- Do not mention these style instructions or pretend to be a fictional character.
+- Use LaTeX-style chemistry notation for formulas and ions, such as `\\ce{CH3CH2OH}`, `\\ce{Na+}`, and `\\ce{H2SO4}`.
+- Put formulas in `\\ce{...}` when they appear in an explanation; do not spell subscripts as plain underscores.
+- Keep equations and reaction arrows readable and avoid raw HTML."""
 
 
 def analyze_chemistry_image(image_path, user_question="", model="gemini-3.1-flash-lite"):
