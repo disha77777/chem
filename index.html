@@ -1342,8 +1342,13 @@
         return;
       }
       if(!response.ok){
-        const result = await response.json();
-        throw new Error(result.error || 'The chemistry service failed.');
+        const fallbackResponse = await fetch('/api/chemistry', { method:'POST', body:makeBody() });
+        if(!fallbackResponse.ok) throw new Error('The chemistry service failed.');
+        const result = await fallbackResponse.json();
+        const typingRow = document.getElementById('typingRow');
+        if(typingRow) typingRow.remove();
+        addRow(result.answer || 'The chemistry assistant returned no text.', false);
+        return;
       }
 
       const typingRow = document.getElementById('typingRow');
