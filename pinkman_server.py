@@ -7,6 +7,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from chem import analyze_chemistry_image
+from api.chemistry import generate_mechanism
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -32,6 +33,9 @@ class PinkmanHandler(SimpleHTTPRequestHandler):
         return super().do_GET()
 
     def do_POST(self):
+        if self.path == "/api/mechanism/generate":
+            self.handle_mechanism_generation()
+            return
         if self.path != "/api/chemistry":
             self.send_error(404, "Endpoint not found")
             return
@@ -68,6 +72,27 @@ class PinkmanHandler(SimpleHTTPRequestHandler):
         finally:
             if temp_path:
                 Path(temp_path).unlink(missing_ok=True)
+
+    def handle_mechanism_generation(self):
+        content_length = int(self.headers.get("Content-Length", "0"))
+        request_body = self.rfile.read(content_length)
+        message = BytesParser(policy=default).parsebytes(
+            b"Content-Type: "
+            + self.headers.get("Content-Type", "").encode("utf-8")
+            + b"\r\nMIME-Version: 1.0\r\n\r\n"
+            + request_body
+        )
+        fields = {
+            part.get_param("name", header="content-disposition"): part
+            for part in message.walk()
+            if part.get_content_disposition() == "form-data"
+        }
+        question_part = fields.get("question")
+        question = question_part.get_content() if question_part else ""
+        try:
+            self._send_json(generate_mechanism(question))
+        except Exception:
+            self._send_json({"error": "The mechanism could not be generated."}, status=500)
 
     def _send_json(self, payload, status=200):
         body = json.dumps(payload).encode("utf-8")
