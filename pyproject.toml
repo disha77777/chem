@@ -1,2 +1,12 @@
+[project]
+name = "pinkman-chemistry"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+	"Flask",
+	"google-genai",
+	"Pillow",
+]
+
 [tool.vercel]
 entrypoint = "api.chemistry:app"
