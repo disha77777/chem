@@ -1032,6 +1032,36 @@
       const decoder = new TextDecoder();
       let buffer = '';
       let answer = '';
+      let queuedText = '';
+      let typingTimer = null;
+      let typingFinished = null;
+      let finishTyping = null;
+
+      function typeNext(){
+        if(!queuedText){
+          typingTimer = null;
+          if(finishTyping){
+            finishTyping();
+            finishTyping = null;
+          }
+          return;
+        }
+        answer += queuedText.slice(0, 4);
+        queuedText = queuedText.slice(4);
+        updateAnswerRow(answerRow, answer);
+        typingTimer = setTimeout(typeNext, 18);
+      }
+
+      function queueText(text){
+        queuedText += text;
+        if(!typingTimer) typeNext();
+      }
+
+      function waitForTyping(){
+        if(!queuedText && !typingTimer) return Promise.resolve();
+        typingFinished = new Promise(resolve => { finishTyping = resolve; });
+        return typingFinished;
+      }
 
       while(true){
         const chunk = await reader.read();
@@ -1045,11 +1075,11 @@
           const result = JSON.parse(line.slice(6));
           if(result.error) throw new Error(result.error);
           if(result.text){
-            answer += result.text;
-            updateAnswerRow(answerRow, answer);
+            queueText(result.text);
           }
         });
       }
+      await waitForTyping();
     }catch(error){
       const typingRow = document.getElementById('typingRow');
       if(typingRow) typingRow.remove();
