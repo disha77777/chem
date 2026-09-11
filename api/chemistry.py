@@ -5,7 +5,7 @@ import time
 from collections import defaultdict, deque
 from pathlib import Path
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 from PIL import Image, UnidentifiedImageError
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -61,6 +61,11 @@ User Question: {question or "Explain the chemistry concept I asked about."}"""
 
 
 @app.get("/")
+def frontend():
+    return send_file(ROOT_DIR / "index.html")
+
+
+@app.get("/api/health")
 def health_check():
     return jsonify({"status": "Pinkman chemistry API is running"})
 
