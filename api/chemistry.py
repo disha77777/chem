@@ -73,14 +73,20 @@ def generate_mechanism(question):
 
 Return ONLY valid JSON with this shape:
 {{
-  "atoms": [{{"id":"a1", "element":"C", "x":300, "y":220}}],
-  "bonds": [{{"from":"a1", "to":"a2", "order":1}}],
-  "arrows": [{{"from":"a3", "to":"a1", "bend":-70}}],
-  "notes": ["short chemistry assumption or uncertainty"]
+    "reaction_type": "SN2|acid_base|other",
+    "steps": [{{
+        "label": "Step 1",
+        "atoms": [{{"id":"a1", "element":"C", "x":300, "y":220}}],
+        "bonds": [{{"from":"a1", "to":"a2", "order":1}}],
+        "arrows": [{{"from":"a3", "to":"a1", "bend":-70}}],
+        "formed_bonds": [{{"from":"a3", "to":"a1", "order":1}}],
+        "broken_bonds": [{{"from":"a1", "to":"a2", "order":1}}],
+        "notes": ["short chemistry assumption or uncertainty"]
+    }}]
 }}
 
 Use a 900 by 460 coordinate space. Use atom labels with charges when needed, such as O- or N+.
-Represent curved arrows from an electron source to an electron sink. Do not invent a stereochemical outcome when the prompt lacks enough structural or conformational information. Return an empty structure and explain the missing information in notes if necessary.
+Represent curved arrows from an electron source to an electron sink. For SN2, the nucleophile arrow MUST end at the electrophilic carbon, and the same step MUST contain a broken C-Br bond and a formed nucleophile-carbon bond. For acid-base, an arrow MUST start from a negatively charged atom or a heteroatom lone-pair source and end at hydrogen; do not use a neutral carbon as the electron source. Keep each elementary transformation in its own step. Do not invent a stereochemical outcome when the prompt lacks enough structural or conformational information.
 """
     response = client.models.generate_content(
         model="gemini-3.1-flash-lite",
@@ -91,9 +97,50 @@ Represent curved arrows from an electron source to an electron sink. Do not inve
     if start < 0 or end <= start:
         raise ValueError("The assistant did not return a structured mechanism.")
     mechanism = json.loads(text[start:end + 1])
-    if not isinstance(mechanism.get("atoms"), list) or not isinstance(mechanism.get("bonds"), list) or not isinstance(mechanism.get("arrows"), list):
+    if not isinstance(mechanism.get("steps"), list) or not mechanism["steps"]:
         raise ValueError("The generated mechanism has an invalid structure.")
+    validate_generated_mechanism(mechanism)
     return mechanism
+
+
+def validate_generated_mechanism(mechanism):
+    """Reject generated structures that violate basic reaction-specific rules."""
+    valence_limits = {"H": 1, "C": 4, "N": 3, "O": 2, "F": 1, "Cl": 1, "Br": 1, "I": 1, "S": 6, "P": 5}
+    reaction_type = mechanism.get("reaction_type", "other")
+    for step in mechanism["steps"]:
+        atoms = {atom.get("id"): atom for atom in step.get("atoms", [])}
+        bonds = step.get("bonds", [])
+        arrows = step.get("arrows", [])
+        if not atoms or not isinstance(bonds, list) or not isinstance(arrows, list):
+            raise ValueError("Each mechanism step needs atoms, bonds, and arrows.")
+        totals = {atom_id: 0 for atom_id in atoms}
+        for bond in bonds:
+            if bond.get("from") not in atoms or bond.get("to") not in atoms or bond.get("from") == bond.get("to"):
+                raise ValueError("A mechanism bond references an invalid atom.")
+            order = int(bond.get("order", 1))
+            totals[bond["from"]] += order
+            totals[bond["to"]] += order
+        for atom_id, atom in atoms.items():
+            symbol = "".join(character for character in str(atom.get("element", "")) if character.isalpha())
+            if symbol in valence_limits and totals[atom_id] > valence_limits[symbol]:
+                raise ValueError(f"Generated {symbol} exceeds its common valence.")
+        if reaction_type == "SN2":
+            carbon_targets = {arrow.get("to") for arrow in arrows if str(atoms.get(arrow.get("to"), {}).get("element", "")).startswith("C")}
+            if not carbon_targets:
+                raise ValueError("SN2 electron arrow must end at an electrophilic carbon.")
+            if not any(
+                str(atoms.get(bond.get("to"), {}).get("element", "")).startswith("Br")
+                or str(atoms.get(bond.get("from"), {}).get("element", "")).startswith("Br")
+                for bond in step.get("broken_bonds", [])
+            ):
+                raise ValueError("SN2 step must include a broken C-Br bond.")
+            if not step.get("formed_bonds"):
+                raise ValueError("SN2 step must include a formed nucleophile-carbon bond.")
+        if reaction_type == "acid_base":
+            if not any("-" in str(atoms.get(arrow.get("from"), {}).get("element", "")) or str(atoms.get(arrow.get("from"), {}).get("element", ""))[:1] in "ONSP" for arrow in arrows):
+                raise ValueError("Acid-base arrow must start from a negative atom or heteroatom.")
+            if not any(str(atoms.get(arrow.get("to"), {}).get("element", "")) == "H" for arrow in arrows):
+                raise ValueError("Acid-base arrow must end at hydrogen.")
 
 
 def save_normalized_image(image):

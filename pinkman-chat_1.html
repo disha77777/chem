@@ -809,6 +809,7 @@
   let pendingImages = []; // { url }
   let mechanismTool = 'select';
   let mechanism = { atoms: [], bonds: [], arrows: [] };
+  let mechanismSteps = [];
   let atomCounter = 0;
   let selectedAtom = null;
   let dragAtom = null;
@@ -833,6 +834,7 @@
 
   function loadMechanismTemplate(name){
     mechanism = { atoms:[], bonds:[], arrows:[] };
+    mechanismSteps = [];
     atomCounter = 0;
     if(name === 'sn2'){
       const carbon = addMechanismAtom('C', 360, 230);
@@ -965,12 +967,14 @@
       const response = await fetch('/api/mechanism/generate', { method:'POST', body });
       const result = await response.json();
       if(!response.ok) throw new Error(result.error || 'Generation failed.');
-      mechanism = { atoms:result.atoms || [], bonds:result.bonds || [], arrows:result.arrows || [] };
+      mechanismSteps = Array.isArray(result.steps) ? result.steps : [];
+      const firstStep = mechanismSteps[0] || result;
+      mechanism = { atoms:firstStep.atoms || [], bonds:firstStep.bonds || [], arrows:firstStep.arrows || [] };
       atomCounter = mechanism.atoms.length;
       selectedAtom = null;
       renderMechanism();
       const notes = result.notes && result.notes.length ? ' Notes: ' + result.notes.join(' ') : '';
-      mechanismStatus.textContent = 'Generated drawing. Validate it before trusting the mechanism.' + notes;
+      mechanismStatus.textContent = `Generated ${mechanismSteps.length || 1} elementary step(s). Validate the active drawing before trusting the mechanism.` + notes;
       validateMechanism();
     }catch(error){ mechanismStatus.textContent='Could not generate the drawing: ' + error.message; }
     finally{ generateMechanismBtn.disabled=false; generateMechanismBtn.textContent='GENERATE DRAWING'; }
@@ -978,7 +982,7 @@
 
   function explainMechanism(){
     if(!validateMechanism()) return;
-    const question = 'Explain this proposed mechanism. Treat this structured drawing as the source of truth. Check atom roles, bond changes, electron-arrow direction, charge balance, and any missing information. Structure: ' + JSON.stringify(mechanism);
+    const question = 'Explain this proposed mechanism. Treat this structured drawing as the source of truth. Check atom roles, bond changes, electron-arrow direction, charge balance, and any missing information. Steps: ' + JSON.stringify(mechanismSteps.length ? mechanismSteps : [mechanism]);
     showChatScreen(); seedChat(); addRow(question, true); showTyping(); requestChemistry(question, []);
   }
 
