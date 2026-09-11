@@ -401,12 +401,38 @@
     border-left: 3px solid var(--pink);
     background: var(--asphalt-3);
     border-radius: 3px 10px 10px 10px;
+    overflow-wrap:anywhere;
   }
   .row.user .bubble{
     border-left:none;
     border-right: 3px solid var(--paper-dim);
     background: rgba(255,255,255,0.03);
     border-radius: 10px 3px 10px 10px;
+  }
+
+  .answer-content p{ margin:0 0 10px; }
+  .answer-content p:last-child{ margin-bottom:0; }
+  .answer-content h3{
+    margin: 4px 0 8px;
+    color: var(--pink-glow);
+    font-family:'Big Shoulders Stencil', sans-serif;
+    font-size:16px;
+    letter-spacing:0.6px;
+    line-height:1.15;
+  }
+  .answer-content ul, .answer-content ol{
+    margin: 4px 0 11px 19px;
+    padding:0;
+  }
+  .answer-content li{ padding-left:3px; margin:4px 0; }
+  .answer-content li::marker{ color:var(--pink-glow); }
+  .answer-content strong{ color:var(--paper); font-weight:600; }
+  .answer-content em{ color:var(--pink-glow); }
+  .answer-content code{
+    color:var(--pink-glow);
+    background:rgba(255,143,184,0.08);
+    padding:1px 4px;
+    font-size:0.92em;
   }
 
   .tag-row{
@@ -736,7 +762,10 @@
     bubble.appendChild(tagRow);
 
     if(text){
-      bubble.appendChild(document.createTextNode(text));
+      const content = document.createElement('div');
+      content.className = isUser ? 'answer-content user-content' : 'answer-content';
+      renderAnswer(text, content);
+      bubble.appendChild(content);
     }
 
     if(images.length){
@@ -756,6 +785,78 @@
     chat.appendChild(row);
     chat.scrollTop = chat.scrollHeight;
     return row;
+  }
+
+  function appendInlineText(parent, text){
+    const tokenPattern = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g;
+    let cursor = 0;
+    let match;
+    while((match = tokenPattern.exec(text))){
+      if(match.index > cursor){
+        parent.appendChild(document.createTextNode(text.slice(cursor, match.index)));
+      }
+      const token = match[0];
+      const element = token.startsWith('`') ? document.createElement('code')
+        : token.startsWith('**') ? document.createElement('strong')
+        : document.createElement('em');
+      element.textContent = token.replace(/^\*\*?|\*\*?$|`/g, '');
+      parent.appendChild(element);
+      cursor = match.index + token.length;
+    }
+    if(cursor < text.length){
+      parent.appendChild(document.createTextNode(text.slice(cursor)));
+    }
+  }
+
+  function renderAnswer(text, container){
+    let list = null;
+    let listType = '';
+
+    function closeList(){
+      if(list){
+        container.appendChild(list);
+        list = null;
+        listType = '';
+      }
+    }
+
+    text.replace(/\r\n?/g, '\n').split('\n').forEach(line => {
+      const trimmed = line.trim();
+      if(!trimmed){
+        closeList();
+        return;
+      }
+
+      const heading = trimmed.match(/^#{1,3}\s+(.+)$/);
+      if(heading){
+        closeList();
+        const element = document.createElement('h3');
+        appendInlineText(element, heading[1]);
+        container.appendChild(element);
+        return;
+      }
+
+      const bullet = trimmed.match(/^[-*]\s+(.+)$/);
+      const numbered = trimmed.match(/^\d+[.)]\s+(.+)$/);
+      if(bullet || numbered){
+        const nextType = bullet ? 'ul' : 'ol';
+        if(!list || listType !== nextType){
+          closeList();
+          list = document.createElement(nextType);
+          listType = nextType;
+        }
+        const item = document.createElement('li');
+        appendInlineText(item, (bullet || numbered)[1]);
+        list.appendChild(item);
+        return;
+      }
+
+      closeList();
+      const paragraph = document.createElement('p');
+      appendInlineText(paragraph, trimmed);
+      container.appendChild(paragraph);
+    });
+    closeList();
   }
 
   function showTyping(){
