@@ -61,6 +61,41 @@ User Question: {question or "Explain the chemistry concept I asked about."}"""
     return response.text
 
 
+def generate_mechanism(question):
+    """Generate a structured mechanism drawing from a chemistry description."""
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        raise RuntimeError("Set GEMINI_API_KEY before using the chemistry assistant.")
+
+    client = genai.Client(api_key=api_key)
+    prompt = f"""Generate a structured organic chemistry mechanism for this request:
+{question}
+
+Return ONLY valid JSON with this shape:
+{{
+  "atoms": [{{"id":"a1", "element":"C", "x":300, "y":220}}],
+  "bonds": [{{"from":"a1", "to":"a2", "order":1}}],
+  "arrows": [{{"from":"a3", "to":"a1", "bend":-70}}],
+  "notes": ["short chemistry assumption or uncertainty"]
+}}
+
+Use a 900 by 460 coordinate space. Use atom labels with charges when needed, such as O- or N+.
+Represent curved arrows from an electron source to an electron sink. Do not invent a stereochemical outcome when the prompt lacks enough structural or conformational information. Return an empty structure and explain the missing information in notes if necessary.
+"""
+    response = client.models.generate_content(
+        model="gemini-3.1-flash-lite",
+        contents=prompt,
+    )
+    text = response.text
+    start, end = text.find("{"), text.rfind("}")
+    if start < 0 or end <= start:
+        raise ValueError("The assistant did not return a structured mechanism.")
+    mechanism = json.loads(text[start:end + 1])
+    if not isinstance(mechanism.get("atoms"), list) or not isinstance(mechanism.get("bonds"), list) or not isinstance(mechanism.get("arrows"), list):
+        raise ValueError("The generated mechanism has an invalid structure.")
+    return mechanism
+
+
 def save_normalized_image(image):
     """Validate and resize an uploaded image before sending it to Gemini."""
     if image.mimetype not in {"image/jpeg", "image/png", "image/webp"}:
@@ -207,6 +242,21 @@ def chemistry_stream():
         mimetype="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@app.post("/api/mechanism/generate")
+def mechanism_generate():
+    """Generate a structured mechanism for the Mechanism Lab."""
+    if not allow_request():
+        return jsonify({"error": "Too many requests. Try again in a minute."}), 429
+    question = request.form.get("question", "").strip()
+    if not question or len(question) > MAX_QUESTION_LENGTH:
+        return jsonify({"error": "Add a mechanism request under 4,000 characters."}), 400
+    try:
+        return jsonify(generate_mechanism(question))
+    except Exception:
+        app.logger.exception("Mechanism generation failed")
+        return jsonify({"error": "The mechanism could not be generated."}), 500
 
 
 @app.errorhandler(413)

@@ -235,6 +235,9 @@
     border:1px solid rgba(255,143,184,0.28); background:var(--asphalt-3); color:var(--paper); padding:7px 9px; cursor:pointer; font:11px 'IBM Plex Mono',monospace;
   }
   .mechanism-tools button.active, .mechanism-tools button:hover, .mechanism-actions button:hover{ border-color:var(--pink); color:var(--pink-glow); }
+  .mechanism-generate{ display:flex; gap:8px; padding:10px clamp(12px,4vw,20px); border-bottom:1px solid rgba(255,143,184,0.1); }
+  .mechanism-generate input{ flex:1; min-width:0; background:var(--asphalt); border:1px solid rgba(255,143,184,0.25); color:var(--paper); padding:9px; font:12px 'IBM Plex Mono',monospace; }
+  .mechanism-generate button{ border:1px solid var(--pink); background:var(--pink); color:var(--asphalt); padding:0 12px; font:700 11px 'IBM Plex Mono',monospace; cursor:pointer; }
   .mechanism-workspace{ flex:1; min-height:0; overflow:auto; padding:12px; }
   .mechanism-canvas-wrap{ position:relative; min-height:340px; height:min(52vh,460px); border:1px solid rgba(255,143,184,0.2); background-color:var(--asphalt); background-image:linear-gradient(rgba(255,255,255,0.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.05) 1px,transparent 1px); background-size:24px 24px; }
   .mechanism-canvas{ width:100%; height:100%; touch-action:none; user-select:none; }
@@ -718,6 +721,7 @@
       <button type="button" data-tool="arrow">Curved arrow</button>
       <button type="button" id="clearMechanismBtn">Clear</button>
     </div>
+    <div class="mechanism-generate"><input id="mechanismPrompt" placeholder="Describe the mechanism, e.g. hydroxide attacks bromoethane by SN2"><button type="button" id="generateMechanismBtn">GENERATE DRAWING</button></div>
     <div class="mechanism-workspace">
       <div class="mechanism-canvas-wrap"><svg class="mechanism-canvas" id="mechanismCanvas" viewBox="0 0 900 460" aria-label="Mechanism drawing canvas"></svg></div>
       <div class="mechanism-status" id="mechanismStatus">Choose a template or add atoms to begin.</div>
@@ -796,6 +800,8 @@
   const validateMechanismBtn = document.getElementById('validateMechanismBtn');
   const explainMechanismBtn = document.getElementById('explainMechanismBtn');
   const exportMechanismBtn = document.getElementById('exportMechanismBtn');
+  const mechanismPrompt = document.getElementById('mechanismPrompt');
+  const generateMechanismBtn = document.getElementById('generateMechanismBtn');
   const recentToggle = document.getElementById('recentToggle');
   const recentList = document.getElementById('recentList');
   const viewAllLink = document.getElementById('viewAllLink');
@@ -947,6 +953,27 @@
     const message = issues.length ? 'Needs work: ' + issues.join(' ') : warnings.length ? 'Warnings: ' + warnings.join(' ') : 'Drawing passes basic checks. Confirm resonance, stereochemistry, and reaction conditions chemically.';
     mechanismStatus.textContent = message;
     return !issues.length;
+  }
+
+  async function generateMechanism(){
+    const question = mechanismPrompt.value.trim();
+    if(!question){ mechanismStatus.textContent='Describe the reaction you want drawn first.'; return; }
+    generateMechanismBtn.disabled = true;
+    generateMechanismBtn.textContent = 'GENERATING...';
+    try{
+      const body = new FormData(); body.append('question', question);
+      const response = await fetch('/api/mechanism/generate', { method:'POST', body });
+      const result = await response.json();
+      if(!response.ok) throw new Error(result.error || 'Generation failed.');
+      mechanism = { atoms:result.atoms || [], bonds:result.bonds || [], arrows:result.arrows || [] };
+      atomCounter = mechanism.atoms.length;
+      selectedAtom = null;
+      renderMechanism();
+      const notes = result.notes && result.notes.length ? ' Notes: ' + result.notes.join(' ') : '';
+      mechanismStatus.textContent = 'Generated drawing. Validate it before trusting the mechanism.' + notes;
+      validateMechanism();
+    }catch(error){ mechanismStatus.textContent='Could not generate the drawing: ' + error.message; }
+    finally{ generateMechanismBtn.disabled=false; generateMechanismBtn.textContent='GENERATE DRAWING'; }
   }
 
   function explainMechanism(){
@@ -1466,6 +1493,7 @@
   validateMechanismBtn.addEventListener('click', validateMechanism);
   explainMechanismBtn.addEventListener('click', explainMechanism);
   exportMechanismBtn.addEventListener('click', exportMechanism);
+  generateMechanismBtn.addEventListener('click', generateMechanism);
 
   recentToggle.addEventListener('click', () => {
     const open = recentList.classList.toggle('open');
