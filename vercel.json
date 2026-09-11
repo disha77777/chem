@@ -1,19 +1,9 @@
 {
   "version": 2,
-  "builds": [
+  "rewrites": [
     {
-      "src": "api/chemistry.py",
-      "use": "@vercel/python"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/chemistry",
-      "dest": "/api/chemistry.py"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/pinkman-chat_1.html"
+      "source": "/",
+      "destination": "/pinkman-chat_1.html"
     }
   ]
 }
