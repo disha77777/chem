@@ -912,10 +912,40 @@
 
   function validateMechanism(){
     const issues=[];
+    const warnings=[];
+    const valenceLimits = { H:1, C:4, N:3, O:2, F:1, Cl:1, Br:1, I:1, S:6, P:5 };
+    const bondKeys = new Set();
+    const bondTotals = new Map();
     if(mechanism.atoms.length < 2) issues.push('Add at least two atoms.');
-    mechanism.bonds.forEach(bond => { if(!atomById(bond.from) || !atomById(bond.to)) issues.push('A bond references a missing atom.'); });
-    mechanism.arrows.forEach(arrow => { if(!atomById(arrow.from) || !atomById(arrow.to)) issues.push('An arrow references a missing atom.'); });
-    mechanismStatus.textContent = issues.length ? 'Needs work: ' + issues.join(' ') : 'Structure is internally connected. Confirm valence, charges, and arrow direction chemically.';
+    mechanism.atoms.forEach(atom => bondTotals.set(atom.id, 0));
+    mechanism.bonds.forEach(bond => {
+      const from = atomById(bond.from), to = atomById(bond.to);
+      if(!from || !to) issues.push('A bond references a missing atom.');
+      if(from && to){
+        if(from.id === to.id) issues.push('An atom cannot bond to itself.');
+        const key = [from.id, to.id].sort().join(':');
+        if(bondKeys.has(key)) issues.push('Duplicate bonds detected. Use bond order for double or triple bonds.');
+        bondKeys.add(key);
+        bondTotals.set(from.id, (bondTotals.get(from.id) || 0) + (bond.order || 1));
+        bondTotals.set(to.id, (bondTotals.get(to.id) || 0) + (bond.order || 1));
+      }
+    });
+    mechanism.atoms.forEach(atom => {
+      const symbol = atom.element.replace(/[^A-Za-z]/g, '');
+      const limit = valenceLimits[symbol];
+      if(limit && (bondTotals.get(atom.id) || 0) > limit) issues.push(`${symbol} exceeds its common valence (${bondTotals.get(atom.id)}).`);
+      if(!(bondTotals.get(atom.id) || 0)) warnings.push(`${symbol} is disconnected; confirm that this is intentional.`);
+    });
+    mechanism.arrows.forEach(arrow => {
+      const from = atomById(arrow.from), to = atomById(arrow.to);
+      if(!from || !to){ issues.push('An arrow references a missing atom.'); return; }
+      const source = from.element.replace(/[^A-Za-z⁻-]/g, '');
+      const sink = to.element.replace(/[^A-Za-z]/g, '');
+      if(!/[ONSPFClBrI]/.test(source) && !from.element.includes('⁻')) warnings.push(`Arrow from ${from.element} may not start at an obvious electron source.`);
+      if(!/[CNSOPH]/.test(sink)) warnings.push(`Arrow target ${to.element} may not be an obvious electron sink.`);
+    });
+    const message = issues.length ? 'Needs work: ' + issues.join(' ') : warnings.length ? 'Warnings: ' + warnings.join(' ') : 'Drawing passes basic checks. Confirm resonance, stereochemistry, and reaction conditions chemically.';
+    mechanismStatus.textContent = message;
     return !issues.length;
   }
 
