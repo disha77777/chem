@@ -1059,7 +1059,7 @@
       }
 
       function queueText(text){
-        queuedText += text;
+        queuedText += text.replace(/\\n/g, '\n');
         if(!typingTimer) typeNext();
       }
 

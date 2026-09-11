@@ -191,7 +191,7 @@ def chemistry_stream():
         try:
             # Flush through serverless/proxy buffers before the model's first token.
             yield ": " + (" " * 2048) + "\n\n"
-            yield f"data: {json.dumps({'text': "Alright, let's break it down.\\n\\n"})}\n\n"
+            yield f"data: {json.dumps({'text': "Alright, let's break it down. "})}\n\n"
             for text in stream_chemistry_answer(question, temporary_path):
                 yield f"data: {json.dumps({'text': text})}\n\n"
             yield "data: {\"done\":true}\n\n"
