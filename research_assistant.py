@@ -1,6 +1,8 @@
 import json
 import os
 import re
+import time
+from collections import defaultdict, deque
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
@@ -9,6 +11,24 @@ from google.genai import types
 
 
 MODEL = "gemini-3.1-flash-lite"
+MAX_RESEARCH_REQUESTS = 5
+RATE_LIMIT_WINDOW_SECONDS = 60
+MAX_QUESTION_LENGTH = 1_500
+MAX_CLAIMS = 5
+MAX_SOURCES = 6
+request_times = defaultdict(deque)
+
+
+def _allow_request(request_key="local"):
+    """Limit expensive grounded searches within one running process."""
+    now = time.monotonic()
+    timestamps = request_times[request_key]
+    while timestamps and now - timestamps[0] >= RATE_LIMIT_WINDOW_SECONDS:
+        timestamps.popleft()
+    if len(timestamps) >= MAX_RESEARCH_REQUESTS:
+        return False
+    timestamps.append(now)
+    return True
 
 
 def _extract_json(text):
@@ -46,6 +66,10 @@ def _validate_report(report):
     claims = report["claims"]
     if not isinstance(claims, list) or not claims:
         raise ValueError("The report returned no source-backed claims.")
+    if len(claims) > MAX_CLAIMS:
+        raise ValueError("The report returned more claims than requested.")
+    if len(sources) > MAX_SOURCES:
+        raise ValueError("The report returned more sources than requested.")
     for claim in claims:
         citations = claim.get("source_ids")
         if not claim.get("text") or not citations or not set(citations).issubset(source_ids):
@@ -59,6 +83,14 @@ def _validate_report(report):
 
 def research_verified(question, date_range="latest available", source_preference="credible primary sources"):
     """Research a question with live search grounding and claim-level citations."""
+    question = question.strip()
+    if not question:
+        raise ValueError("Enter a research question.")
+    if len(question) > MAX_QUESTION_LENGTH:
+        raise ValueError(f"Research question must be {MAX_QUESTION_LENGTH} characters or fewer.")
+    if not _allow_request():
+        raise RuntimeError("Research rate limit reached. Wait a minute before searching again.")
+
     api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
     if not api_key:
         raise RuntimeError("Set GEMINI_API_KEY in .env before using Verified Research.")
@@ -73,6 +105,9 @@ Use live web search grounding. Do not answer from memory when the question asks 
 Prefer primary sources: government agencies, official statistics, universities, standards bodies, company filings, and original research. Use reputable secondary sources only when primary sources are unavailable.
 
 Rules:
+- Answer only the exact question. Do not add background, tangents, recommendations, or extra statistics that were not requested.
+- Return at most 5 claims and 6 sources. Include only sources cited by a claim.
+- Keep the answer under 120 words unless the question explicitly requires a comparison or explanation.
 - Never invent facts, dates, numbers, quotations, URLs, or sources.
 - Every factual claim must cite one or more source IDs.
 - If sources disagree, report the disagreement instead of choosing silently.
@@ -113,7 +148,9 @@ Return this exact shape:
         model=MODEL,
         contents=prompt,
         config=types.GenerateContentConfig(
-            tools=[types.Tool(google_search=types.GoogleSearch())]
+            tools=[types.Tool(google_search=types.GoogleSearch())],
+            max_output_tokens=1200,
+            temperature=0.1,
         ),
     )
     return _validate_report(_extract_json(response.text))
